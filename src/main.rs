@@ -1,17 +1,17 @@
 use std::{
     error::Error,
     fs::read_to_string,
-    io::{stdout, Write},
     time::Duration,
+    io::stdout,
 };
 
 use clap::Parser;
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
-    event::{poll, Event},
     style::{Color, Print, SetForegroundColor},
     terminal::{Clear, ClearType, enable_raw_mode, disable_raw_mode},
-    ExecutableCommand, QueueableCommand,
+    ExecutableCommand,
+    event::poll
 };
 use rand::Rng;
 
@@ -74,16 +74,15 @@ fn print_colored_text(
                 (progress / 100.0 + calculate_progress(i, j, line_count, max_line_len)) % 1.0;
             let color = lerp(&start, &end, progress);
             stdout()
-                .queue(SetForegroundColor(Color::Rgb {
+                .execute(SetForegroundColor(Color::Rgb {
                     r: color.r as u8,
                     g: color.g as u8,
                     b: color.b as u8,
                 }))?
-                .queue(Print(ch))?;
+                .execute(Print(ch))?;
         }
-        stdout().queue(Print('\n'))?;
+        stdout().execute(Print("\r\n"))?;
     }
-    stdout().flush()?;
     Ok(())
 }
 
@@ -108,22 +107,25 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     stdout().execute(Hide)?;
     stdout().execute(Clear(ClearType::All))?;
+    enable_raw_mode()?;
+
     loop {
         stdout().execute(MoveTo(0, 0))?;
 
         print_colored_text(text, &start, &end, progress as f64)?;
 
-        if poll(Duration::from_millis(500))? {
+        if poll(Duration::from_millis(200))? {
             match crossterm::event::read()? {
-                Event::Key(_) => {
-                    break
-                }
                 _ => (),
             }
+            break
         }
         progress += 1;
         progress %= 100;
     }
+
+    disable_raw_mode()?;
+    stdout().execute(MoveTo(0, 0))?;
     stdout().execute(Show)?;
     stdout().execute(Clear(ClearType::All))?;
     Ok(())
