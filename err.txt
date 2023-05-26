@@ -1,0 +1,3 @@
+   Compiling amongus v0.1.0 (/Users/achyuta/Desktop/Projects/amongus)
+    Finished dev [unoptimized + debuginfo] target(s) in 0.91s
+     Running `target/debug/amongus`

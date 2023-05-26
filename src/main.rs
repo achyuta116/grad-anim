@@ -1,7 +1,7 @@
 use std::{
     error::Error,
     fs::read_to_string,
-    io::stdout,
+    io::{stdout, Write},
     time::Duration,
 };
 
@@ -9,9 +9,9 @@ use clap::Parser;
 use crossterm::{
     cursor::{Hide, MoveTo, Show},
     event::{poll, Event},
-    style::Print,
-    terminal::{Clear, ClearType},
-    ExecutableCommand,
+    style::{Color, Print, SetForegroundColor},
+    terminal::{Clear, ClearType, enable_raw_mode, disable_raw_mode},
+    ExecutableCommand, QueueableCommand,
 };
 use rand::Rng;
 
@@ -68,23 +68,22 @@ fn print_colored_text(
     let line_count = text.lines().count();
     let max_line_len = text.lines().map(|line| line.len()).max().unwrap_or(0);
     let mut text = text.lines().enumerate();
-    let mut to_print_line = String::from("");
     while let Some((i, line)) = text.next() {
         for (j, ch) in line.chars().enumerate() {
             let progress =
                 (progress / 100.0 + calculate_progress(i, j, line_count, max_line_len)) % 1.0;
             let color = lerp(&start, &end, progress);
-            to_print_line.push_str(
-                format!(
-                    "\x1b[38;2;{};{};{}m{}\x1b[0m",
-                    color.r as u8, color.g as u8, color.b as u8, ch
-                )
-                .as_str(),
-            );
+            stdout()
+                .queue(SetForegroundColor(Color::Rgb {
+                    r: color.r as u8,
+                    g: color.g as u8,
+                    b: color.b as u8,
+                }))?
+                .queue(Print(ch))?;
         }
-        to_print_line.push('\n');
+        stdout().queue(Print('\n'))?;
     }
-    stdout().execute(Print(to_print_line))?;
+    stdout().flush()?;
     Ok(())
 }
 
@@ -108,23 +107,24 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
 
     stdout().execute(Hide)?;
-
+    stdout().execute(Clear(ClearType::All))?;
     loop {
         stdout().execute(MoveTo(0, 0))?;
 
         print_colored_text(text, &start, &end, progress as f64)?;
 
-        if poll(Duration::from_millis(200))? {
+        if poll(Duration::from_millis(500))? {
             match crossterm::event::read()? {
-                Event::Key(_) => break,
+                Event::Key(_) => {
+                    break
+                }
                 _ => (),
             }
         }
         progress += 1;
         progress %= 100;
-        stdout().execute(Clear(ClearType::All))?;
     }
-
     stdout().execute(Show)?;
+    stdout().execute(Clear(ClearType::All))?;
     Ok(())
 }
